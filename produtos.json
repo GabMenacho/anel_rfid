@@ -1,22 +1,22 @@
 {
   "produtos": {
-    "04:A1:B2:C3": {
-      "nome": "Base liquida",
-      "cor": "Nude 02",
-      "marca": "Natura",
-      "audio": "audio/produto_base_nude02.wav"
+    "04:16:A5:99:C9:2A:81": {
+      "nome": "Pó Solto Fixador",
+      "cor": "Yellowish",
+      "marca": "Makie",
+      "audio": "audio/po_makie_yellowish.wav"
     },
-    "11:22:33:44": {
-      "nome": "Batom",
-      "cor": "Vermelho classico",
-      "marca": "Avon",
-      "audio": "audio/produto_batom_vermelho.wav"
+    "04:19:A5:99:C9:2A:81": {
+      "nome": "Iluminador Líquido Hello Kitty",
+      "cor": "Candy",
+      "marca": "Bruna Tavares",
+      "audio": "audio/iluminador_liq_bt_hellokitty_candy.wav"
     },
-    "AA:BB:CC:DD": {
-      "nome": "Rimel (mascara de cilios)",
-      "cor": "Preto",
-      "marca": "Eudora",
-      "audio": "audio/produto_rimel_preto.wav"
+    "04:D3:9F:99:C9:2A:81": {
+      "nome": "Blush Líquido Hello Kitty",
+      "cor": "Pink Bow",
+      "marca": "Bruna Tavares",
+      "audio": "audio/blush_bthellokitty_pink_bow.wav"
     }
   }
 }
