@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Anel RFID - Cadastro de produtos</title>
+<style>
+  :root {
+    --berry: #6D2E46;
+    --rose: #A26769;
+    --cream: #ECE2D0;
+    --ink: #2B2024;
+    --ok: #3f7a4f;
+    --err: #a3362f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+  }
+  header {
+    background: var(--berry);
+    color: #fff;
+    padding: 22px 20px;
+    text-align: center;
+  }
+  header h1 { margin: 0 0 4px; font-size: 1.4rem; }
+  header a { color: #fff; }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 20px 16px 60px;
+  }
+  section {
+    background: #fff;
+    border: 1px solid #ddd0c4;
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  section h2 {
+    margin: 0 0 12px;
+    font-size: 1.05rem;
+    color: var(--berry);
+  }
+  label {
+    display: block;
+    font-size: .82rem;
+    color: var(--rose);
+    font-weight: 600;
+    margin: 10px 0 4px;
+  }
+  input[type=text], input[type=password], input[type=file] {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ccb;
+    border-radius: 8px;
+    font-size: .95rem;
+    background: #fffdf9;
+  }
+  small.help { display: block; color: #8a7a7f; font-size: .76rem; margin-top: 3px; }
+  button {
+    margin-top: 14px;
+    background: var(--berry);
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 999px;
+    font-size: .9rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: var(--rose); }
+  button.danger { background: var(--err); padding: 5px 10px; font-size: .78rem; }
+  button:disabled { opacity: .5; cursor: default; }
+  #msg {
+    margin-top: 12px;
+    font-size: .88rem;
+    white-space: pre-wrap;
+  }
+  #msg.ok { color: var(--ok); }
+  #msg.err { color: var(--err); }
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #eee2d6; vertical-align: top; }
+  th { color: var(--rose); font-size: .78rem; text-transform: uppercase; }
+  .uid-mono { font-family: monospace; }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#9999;&#65039; Painel do Anel RFID</h1>
+  <a href="../">&larr; ver catalogo publico</a>
+</header>
+<main>
+
+<section>
+  <h2>1. Conexao com o GitHub</h2>
+  <label>Repositorio (usuario/repo)</label>
+  <input type="text" id="repo" placeholder="ex: maria/anel-rfid-produtos" />
+
+  <label>Branch</label>
+  <input type="text" id="branch" value="main" />
+
+  <label>Token de acesso pessoal (Personal Access Token)</label>
+  <input type="password" id="token" placeholder="ghp_..." />
+  <small class="help">
+    Crie em GitHub &rarr; Settings &rarr; Developer settings &rarr; Personal access tokens
+    (fine-grained), com permissao <b>Contents: Read and write</b> somente neste repositorio.
+    O token fica salvo apenas no seu navegador (localStorage) e e enviado direto para a
+    API do GitHub &mdash; nunca passa por nenhum outro servidor.
+  </small>
+
+  <button id="btnSalvarConexao">Salvar e carregar produtos</button>
+  <div id="msg"></div>
+</section>
+
+<section id="secLista" style="display:none">
+  <h2>2. Produtos cadastrados</h2>
+  <table>
+    <thead><tr><th>UID</th><th>Nome</th><th>Cor</th><th>Marca</th><th>Audio</th><th></th></tr></thead>
+    <tbody id="corpoTabela"></tbody>
+  </table>
+</section>
+
+<section id="secForm" style="display:none">
+  <h2 id="tituloForm">3. Cadastrar / editar produto</h2>
+
+  <label>UID da tag (formato AA:BB:CC:DD)</label>
+  <input type="text" id="uid" placeholder="04:A1:B2:C3" />
+  <small class="help">
+    Aproxime a tag do anel e rode <code>descobrir_uid()</code> no console do
+    viper-ide para ver o UID exato a copiar aqui.
+  </small>
+
+  <label>Nome do produto</label>
+  <input type="text" id="nome" placeholder="Base liquida" />
+
+  <label>Cor</label>
+  <input type="text" id="cor" placeholder="Nude 02" />
+
+  <label>Marca</label>
+  <input type="text" id="marca" placeholder="Natura" />
+
+  <label>Arquivo de audio (.wav ou .mp3) &mdash; opcional</label>
+  <input type="file" id="audio" accept=".wav,.mp3,audio/*" />
+  <small class="help" id="audioAtual"></small>
+
+  <button id="btnSalvarProduto">Salvar produto</button>
+  <button class="secondary" id="btnLimparForm" type="button">Limpar formulario</button>
+  <div id="msgForm"></div>
+</section>
+
+</main>
+
+<script>
+const LS_REPO = "anelrfid_repo";
+const LS_BRANCH = "anelrfid_branch";
+const LS_TOKEN = "anelrfid_token";
+
+let produtosObj = {};   // { uid: {nome, cor, marca, audio} }
+let shaProdutos = null; // sha atual de produtos.json (necessario para atualizar)
+let editandoUid = null; // UID em edicao, se houver
+
+const el = (id) => document.getElementById(id);
+
+function api() {
+  const repo = el("repo").value.trim();
+  const branch = el("branch").value.trim() || "main";
+  const token = el("token").value.trim();
+  return { repo, branch, token };
+}
+
+function headers(token) {
+  return {
+    "Authorization": "token " + token,
+    "Accept": "application/vnd.github+json",
+  };
+}
+
+// ---------- base64 helpers (UTF-8 seguro) ----------
+function strToBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  return bytesToBase64(bytes);
+}
+function bytesToBase64(bytes) {
+  let binario = "";
+  const tamanhoBloco = 0x8000;
+  for (let i = 0; i < bytes.length; i += tamanhoBloco) {
+    binario += String.fromCharCode.apply(null, bytes.subarray(i, i + tamanhoBloco));
+  }
+  return btoa(binario);
+}
+function arquivoParaBase64(arquivo) {
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = () => {
+      const bytes = new Uint8Array(leitor.result);
+      resolve(bytesToBase64(bytes));
+    };
+    leitor.onerror = reject;
+    leitor.readAsArrayBuffer(arquivo);
+  });
+}
+
+function mostrarMsg(elId, texto, tipo) {
+  const alvo = el(elId);
+  alvo.textContent = texto;
+  alvo.className = tipo || "";
+}
+
+// ---------- GitHub Contents API ----------
+async function getConteudo(caminho) {
+  const { repo, branch, token } = api();
+  const url = `https://api.github.com/repos/${repo}/contents/${caminho}?ref=${encodeURIComponent(branch)}`;
+  const resp = await fetch(url, { headers: headers(token) });
+  if (resp.status === 404) return null;
+  if (!resp.ok) throw new Error(`GET ${caminho} -> HTTP ${resp.status}: ${await resp.text()}`);
+  return resp.json(); // { content (base64), sha, ... }
+}
+
+async function putConteudo(caminho, conteudoBase64, mensagem, shaExistente) {
+  const { repo, branch, token } = api();
+  const url = `https://api.github.com/repos/${repo}/contents/${caminho}`;
+  const corpo = {
+    message: mensagem,
+    content: conteudoBase64,
+    branch: branch,
+  };
+  if (shaExistente) corpo.sha = shaExistente;
+  const resp = await fetch(url, {
+    method: "PUT",
+    headers: { ...headers(token), "Content-Type": "application/json" },
+    body: JSON.stringify(corpo),
+  });
+  if (!resp.ok) throw new Error(`PUT ${caminho} -> HTTP ${resp.status}: ${await resp.text()}`);
+  return resp.json();
+}
+
+// ---------- fluxo principal ----------
+async function carregarProdutos() {
+  mostrarMsg("msg", "Carregando produtos.json...", "");
+  const dado = await getConteudo("produtos.json");
+  if (dado === null) {
+    produtosObj = {};
+    shaProdutos = null;
+    mostrarMsg("msg", "produtos.json ainda nao existe neste repositorio; sera criado ao salvar o primeiro produto.", "ok");
+  } else {
+    const texto = decodeURIComponent(escape(atob(dado.content.replace(/\n/g, ""))));
+    const json = JSON.parse(texto);
+    produtosObj = json.produtos || {};
+    shaProdutos = dado.sha;
+    mostrarMsg("msg", "Conectado! " + Object.keys(produtosObj).length + " produto(s) carregado(s).", "ok");
+  }
+  el("secLista").style.display = "";
+  el("secForm").style.display = "";
+  renderizarTabela();
+}
+
+function renderizarTabela() {
+  const corpo = el("corpoTabela");
+  corpo.innerHTML = "";
+  const uids = Object.keys(produtosObj).sort();
+  if (uids.length === 0) {
+    corpo.innerHTML = '<tr><td colspan="6" style="color:#9a8a8f">Nenhum produto cadastrado ainda.</td></tr>';
+    return;
+  }
+  uids.forEach((uid) => {
+    const p = produtosObj[uid];
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="uid-mono">${uid}</td>
+      <td>${p.nome || ""}</td>
+      <td>${p.cor || ""}</td>
+      <td>${p.marca || ""}</td>
+      <td>${p.audio ? p.audio.split("/").pop() : "-"}</td>
+      <td>
+        <button class="secondary" data-acao="editar" data-uid="${uid}">Editar</button>
+        <button class="danger" data-acao="remover" data-uid="${uid}">Remover</button>
+      </td>
+    `;
+    corpo.appendChild(tr);
+  });
+}
+
+el("corpoTabela").addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("button");
+  if (!btn) return;
+  const uid = btn.dataset.uid;
+  if (btn.dataset.acao === "editar") {
+    preencherFormParaEdicao(uid);
+  } else if (btn.dataset.acao === "remover") {
+    if (!confirm(`Remover o produto com UID ${uid}? (o arquivo de audio nao e apagado, so a entrada em produtos.json)`)) return;
+    delete produtosObj[uid];
+    try {
+      await salvarProdutosJson(`Remove produto ${uid}`);
+      mostrarMsg("msg", "Produto removido.", "ok");
+      renderizarTabela();
+    } catch (e) {
+      mostrarMsg("msg", "Erro ao remover: " + e.message, "err");
+    }
+  }
+});
+
+function preencherFormParaEdicao(uid) {
+  const p = produtosObj[uid];
+  editandoUid = uid;
+  el("tituloForm").textContent = "3. Editando produto " + uid;
+  el("uid").value = uid;
+  el("nome").value = p.nome || "";
+  el("cor").value = p.cor || "";
+  el("marca").value = p.marca || "";
+  el("audio").value = "";
+  el("audioAtual").textContent = p.audio ? ("Audio atual: " + p.audio + " (envie um novo arquivo so se quiser substituir)") : "Nenhum audio cadastrado ainda.";
+  window.scrollTo({ top: el("secForm").offsetTop - 10, behavior: "smooth" });
+}
+
+el("btnLimparForm").addEventListener("click", () => {
+  editandoUid = null;
+  el("tituloForm").textContent = "3. Cadastrar / editar produto";
+  ["uid", "nome", "cor", "marca"].forEach((id) => (el(id).value = ""));
+  el("audio").value = "";
+  el("audioAtual").textContent = "";
+  mostrarMsg("msgForm", "", "");
+});
+
+function nomeArquivoSeguro(nomeOriginal, uid) {
+  const limpo = nomeOriginal.toLowerCase().replace(/[^a-z0-9.]+/g, "_");
+  return limpo;
+}
+
+async function salvarProdutosJson(mensagem) {
+  const corpoJson = JSON.stringify({ produtos: produtosObj }, null, 2);
+  const resultado = await putConteudo("produtos.json", strToBase64(corpoJson), mensagem, shaProdutos);
+  shaProdutos = resultado.content.sha;
+}
+
+el("btnSalvarConexao").addEventListener("click", async () => {
+  const { repo, branch, token } = api();
+  if (!repo || !token) {
+    mostrarMsg("msg", "Preencha repositorio e token.", "err");
+    return;
+  }
+  localStorage.setItem(LS_REPO, repo);
+  localStorage.setItem(LS_BRANCH, branch);
+  localStorage.setItem(LS_TOKEN, token);
+  try {
+    await carregarProdutos();
+  } catch (e) {
+    mostrarMsg("msg", "Erro ao conectar: " + e.message, "err");
+  }
+});
+
+el("btnSalvarProduto").addEventListener("click", async () => {
+  const uid = el("uid").value.trim().toUpperCase();
+  const nome = el("nome").value.trim();
+  const cor = el("cor").value.trim();
+  const marca = el("marca").value.trim();
+  const arquivo = el("audio").files[0];
+
+  if (!uid || !nome) {
+    mostrarMsg("msgForm", "Preencha ao menos o UID e o nome do produto.", "err");
+    return;
+  }
+
+  el("btnSalvarProduto").disabled = true;
+  mostrarMsg("msgForm", "Salvando...", "");
+
+  try {
+    let caminhoAudio = (produtosObj[uid] && produtosObj[uid].audio) || null;
+
+    if (arquivo) {
+      const nomeArq = nomeArquivoSeguro(arquivo.name, uid);
+      caminhoAudio = "audio/" + nomeArq;
+      const base64Audio = await arquivoParaBase64(arquivo);
+
+      // ve se ja existe, para mandar o sha certo (sobrescrever) ou nao (criar)
+      let shaAudio = null;
+      try {
+        const existente = await getConteudo(caminhoAudio);
+        if (existente) shaAudio = existente.sha;
+      } catch (e) { /* ignora - assume que nao existe */ }
+
+      await putConteudo(caminhoAudio, base64Audio, `Audio do produto ${uid}`, shaAudio);
+    }
+
+    // se o UID mudou durante uma edicao, remove a entrada antiga
+    if (editandoUid && editandoUid !== uid) {
+      delete produtosObj[editandoUid];
+    }
+
+    produtosObj[uid] = { nome, cor, marca, audio: caminhoAudio };
+    await salvarProdutosJson(`Cadastra/atualiza produto ${uid}`);
+
+    mostrarMsg("msgForm", "Produto salvo com sucesso!", "ok");
+    renderizarTabela();
+    el("btnLimparForm").click();
+  } catch (e) {
+    mostrarMsg("msgForm", "Erro ao salvar: " + e.message, "err");
+  } finally {
+    el("btnSalvarProduto").disabled = false;
+  }
+});
+
+// restaura conexao salva
+window.addEventListener("load", () => {
+  const repo = localStorage.getItem(LS_REPO);
+  const branch = localStorage.getItem(LS_BRANCH);
+  const token = localStorage.getItem(LS_TOKEN);
+  if (repo) el("repo").value = repo;
+  if (branch) el("branch").value = branch;
+  if (token) el("token").value = token;
+  if (repo && token) {
+    carregarProdutos().catch((e) => mostrarMsg("msg", "Erro ao conectar: " + e.message, "err"));
+  }
+});
+</script>
+</body>
+</html>

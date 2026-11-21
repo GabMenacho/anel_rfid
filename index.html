@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Anel RFID - Catalogo de produtos</title>
+<style>
+  :root {
+    --berry: #6D2E46;
+    --rose: #A26769;
+    --cream: #ECE2D0;
+    --ink: #2B2024;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+  }
+  header {
+    background: var(--berry);
+    color: #fff;
+    padding: 28px 20px;
+    text-align: center;
+  }
+  header h1 { margin: 0 0 6px; font-size: 1.6rem; }
+  header p { margin: 0; opacity: .85; font-size: .95rem; }
+  header a {
+    color: #fff;
+    text-decoration: underline;
+  }
+  main {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 24px 16px 60px;
+  }
+  #status { text-align: center; color: #6b5a5f; margin: 20px 0; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #ddd0c4;
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .card h3 {
+    margin: 0 0 8px;
+    color: var(--berry);
+    font-size: 1.05rem;
+  }
+  .card dl {
+    margin: 0;
+    font-size: .9rem;
+  }
+  .card dt { color: var(--rose); font-weight: 600; display: inline; }
+  .card dd { display: inline; margin: 0 0 0 4px; }
+  .card dd + dt { display: block; margin-top: 4px; }
+  .uid {
+    margin-top: 10px;
+    font-size: .75rem;
+    color: #9a8a8f;
+    letter-spacing: .5px;
+  }
+  audio { width: 100%; margin-top: 10px; }
+  footer {
+    text-align: center;
+    padding: 20px;
+    font-size: .8rem;
+    color: #8a7a7f;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#128141; Anel RFID &mdash; produtos cadastrados</h1>
+  <p>Base usada pelo anel para identificar os produtos por aproximacao.
+     Para cadastrar ou editar, acesse <a href="admin/">o painel de administracao</a>.</p>
+</header>
+<main>
+  <p id="status">Carregando produtos...</p>
+  <div class="grid" id="grid"></div>
+</main>
+<footer>Anel Inteligente com RFID/NFC para Maquiagem Acessivel</footer>
+
+<script>
+async function carregar() {
+  const status = document.getElementById("status");
+  const grid = document.getElementById("grid");
+  try {
+    const resp = await fetch("produtos.json", { cache: "no-store" });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const dados = await resp.json();
+    const produtos = dados.produtos || {};
+    const uids = Object.keys(produtos);
+    if (uids.length === 0) {
+      status.textContent = "Nenhum produto cadastrado ainda.";
+      return;
+    }
+    status.remove();
+    uids.sort().forEach((uid) => {
+      const p = produtos[uid];
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <h3>${escapeHtml(p.nome || "(sem nome)")}</h3>
+        <dl>
+          <dt>Cor:</dt><dd>${escapeHtml(p.cor || "-")}</dd>
+          <dt>Marca:</dt><dd>${escapeHtml(p.marca || "-")}</dd>
+        </dl>
+        <div class="uid">UID: ${escapeHtml(uid)}</div>
+        ${p.audio ? `<audio controls src="${encodeURI(p.audio)}"></audio>` : ""}
+      `;
+      grid.appendChild(card);
+    });
+  } catch (e) {
+    status.textContent = "Nao foi possivel carregar produtos.json (" + e.message + ").";
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+carregar();
+</script>
+</body>
+</html>

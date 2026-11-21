@@ -1,0 +1,22 @@
+{
+  "produtos": {
+    "04:A1:B2:C3": {
+      "nome": "Base liquida",
+      "cor": "Nude 02",
+      "marca": "Natura",
+      "audio": "audio/produto_base_nude02.wav"
+    },
+    "11:22:33:44": {
+      "nome": "Batom",
+      "cor": "Vermelho classico",
+      "marca": "Avon",
+      "audio": "audio/produto_batom_vermelho.wav"
+    },
+    "AA:BB:CC:DD": {
+      "nome": "Rimel (mascara de cilios)",
+      "cor": "Preto",
+      "marca": "Eudora",
+      "audio": "audio/produto_rimel_preto.wav"
+    }
+  }
+}
